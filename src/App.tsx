@@ -7,10 +7,21 @@ import {
   updateLog,
   deleteLog,
   convertLogContent,
+  askAboutLogs,
   DailyLog
 } from './services/ipc';
 import { buildImportEntry, ImportEntry } from './services/importer';
+import type { RagLogHit } from './services/ipc';
 import './App.css';
+
+type ChatRole = 'user' | 'assistant';
+
+interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  engine?: string;
+  context?: RagLogHit[];
+}
 
 function App() {
   const [logs, setLogs] = useState<DailyLog[]>([]);
@@ -29,6 +40,15 @@ function App() {
   const [successMsg, setSuccessMsg] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [convertEngine, setConvertEngine] = useState('');
+  const [isRagPanelOpen, setIsRagPanelOpen] = useState(true);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      content: '업무일지에서 필요한 내용을 찾아드릴게요. 질문을 입력하면 관련 일지를 모아 답변합니다.',
+    },
+  ]);
+  const [isAsking, setIsAsking] = useState(false);
   const [importEntries, setImportEntries] = useState<ImportEntry[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isSavingImports, setIsSavingImports] = useState(false);
@@ -266,6 +286,52 @@ function App() {
     }
   };
 
+  const sampleQuestions = [
+    '지난달 A프로젝트 이슈 뭐 있었어?',
+    '6월에 고객 불량 대응한 내용 알려줘',
+    '이번 주에 마무리한 업무를 요약해줘',
+  ];
+
+  const askQuestion = async (questionText?: string) => {
+    const question = (questionText ?? aiQuestion).trim();
+    if (!question) {
+      showError('질문을 입력해 주세요.');
+      return;
+    }
+
+    setIsAsking(true);
+    setAiQuestion('');
+    setChatMessages((prev) => [...prev, { role: 'user', content: question }]);
+    try {
+      const result = await askAboutLogs(question);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: result.answer,
+          engine: result.engine,
+          context: result.context,
+        },
+      ]);
+      showSuccess(
+        result.engine === 'llama.cpp'
+          ? '로컬 LLM으로 답변을 생성했습니다.'
+          : '관련 일지를 기반으로 오프라인 RAG 요약을 생성했습니다.'
+      );
+    } catch (err: any) {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '질문을 처리하지 못했습니다. 다시 시도해 주세요.',
+        },
+      ]);
+      showError('질문 처리 실패: ' + err.toString());
+    } finally {
+      setIsAsking(false);
+    }
+  };
+
   const handleConvert = async () => {
     if (!editorContent.trim()) {
       showError('AI Convert를 실행할 내용을 입력해 주세요.');
@@ -346,10 +412,18 @@ function App() {
         <div className="brand">
           <span className="logo-icon">📝</span>
           <h1>BuildAI</h1>
-          <span className="badge">3단계</span>
+          <span className="badge">4단계</span>
         </div>
         
         <div className="filter-bar">
+          <button
+            type="button"
+            className="rag-toggle-btn"
+            onClick={() => setIsRagPanelOpen((prev) => !prev)}
+            title="업무일지에서 AI에게 질문"
+          >
+            {isRagPanelOpen ? 'AI 패널 닫기' : 'AI에게 물어보기'}
+          </button>
           <div className="search-input-wrapper">
             <span className="search-icon">🔍</span>
             <input
@@ -447,6 +521,67 @@ function App() {
 
         {/* Right Pane: Detail View & Editor */}
         <main className="editor-pane">
+          {isRagPanelOpen && (
+            <section className="rag-panel">
+              <div className="rag-header">
+                <div>
+                  <h2>AI에게 물어보기</h2>
+                  <p>SQLite 업무일지에서 관련 내용을 찾아 로컬 LLM으로 답합니다.</p>
+                </div>
+                <div className="rag-actions">
+                  <button type="button" className="rag-sample-btn" onClick={() => askQuestion(sampleQuestions[0])}>
+                    예시 1
+                  </button>
+                  <button type="button" className="rag-sample-btn" onClick={() => askQuestion(sampleQuestions[1])}>
+                    예시 2
+                  </button>
+                  <button type="button" className="rag-sample-btn" onClick={() => askQuestion(sampleQuestions[2])}>
+                    예시 3
+                  </button>
+                </div>
+              </div>
+
+              <div className="rag-thread">
+                {chatMessages.map((message, index) => (
+                  <div key={`${message.role}-${index}`} className={`rag-message ${message.role}`}>
+                    <div className="rag-message-label">
+                      {message.role === 'user' ? '질문' : message.engine ? `답변 · ${message.engine}` : '답변'}
+                    </div>
+                    <div className="rag-message-body">{message.content}</div>
+                    {message.context && message.context.length > 0 && (
+                      <div className="rag-context-list">
+                        {message.context.slice(0, 4).map((hit) => (
+                          <div key={hit.id} className="rag-context-item">
+                            <span className="rag-context-date">{hit.date}</span>
+                            <span className="rag-context-title">{hit.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="rag-compose">
+                <textarea
+                  className="rag-input"
+                  placeholder="예: 지난달 A프로젝트 이슈 뭐 있었어?"
+                  value={aiQuestion}
+                  onChange={(event) => setAiQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      askQuestion();
+                    }
+                  }}
+                />
+                <button type="button" className="rag-send-btn" onClick={() => askQuestion()} disabled={isAsking}>
+                  {isAsking ? '검색 중...' : '질문'}
+                </button>
+              </div>
+            </section>
+          )}
+
           <section
             className={`import-panel ${dragActive ? 'active' : ''}`}
             onDragEnter={(event) => {

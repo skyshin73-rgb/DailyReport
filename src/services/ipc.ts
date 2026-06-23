@@ -15,6 +15,23 @@ export interface ConvertResult {
   prompt: string;
 }
 
+export interface RagLogHit {
+  id: number;
+  date: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  score: number;
+}
+
+export interface RagResult {
+  answer: string;
+  engine: string;
+  prompt: string;
+  context: RagLogHit[];
+}
+
 /**
  * 현재 SQLite 데이터베이스 파일 경로를 조회합니다.
  */
@@ -93,5 +110,14 @@ export async function convertLogContent(
   return await invoke<ConvertResult>('convert_log_content', {
     title: title || null,
     content,
+  });
+}
+
+/**
+ * SQLite에서 관련 업무일지를 찾고 로컬 LLM 또는 오프라인 요약으로 답변을 생성합니다.
+ */
+export async function askAboutLogs(question: string): Promise<RagResult> {
+  return await invoke<RagResult>('ask_about_logs', {
+    question,
   });
 }

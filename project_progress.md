@@ -33,8 +33,8 @@
 
 ## 📈 진행률 및 상태 요약
 
-* **현재 단계**: 3단계 구현 완료
-* **전체 진행률**: 70%
+* **현재 단계**: 4단계 구현 완료
+* **전체 진행률**: 90%
 * **완료된 작업**:
   * [x] Tauri v2 + React + TypeScript 프로젝트 스캐폴딩 및 `main.rs` 빌드 에러 해결
   * [x] npm 의존성 설치 및 빌드 환경(Cargo & Rust 환경) 검증 완료
@@ -47,9 +47,10 @@
   * [x] **프론트엔드 Convert UI 추가**: `AI Convert` 버튼, 변환 중 상태, 변환 엔진 표시, 오류 안내 연결
   * [x] **대량 과거 일지 업로드 기능 구현**: txt 파일/폴더 선택, 드래그앤드롭, 자동 날짜 추출, 수동 날짜 확인, 일괄 저장 대기열 추가
   * [x] **날짜 추출 규칙 정리**: `2026-06-17`, `2026.06.17`, `260617`, `20260617` 형식을 자동 인식하고, 실패 시 사용자 확인 입력으로 보정 가능
+  * [x] **로컬 RAG 검색 기능 구현**: SQLite 업무일지에서 관련 항목을 검색하고, 질문에 맞는 맥락을 구성해 로컬 LLM으로 응답
+  * [x] **AI 질문 패널 추가**: `AI에게 물어보기` 버튼, 대화형 질의응답 패널, 예시 질문, 검색된 참고 일지 표시
   * [x] **검증 완료**: `npm run build`, `cargo check` 통과
 * **미진한 사항 / 진행 예정**:
-  * [ ] SQLite 데이터 기반 로컬 RAG 검색 기능 구현 (4단계)
   * [ ] llama.cpp / SQLite / GGUF 모델 패키징 및 최종 exe 빌드 (5단계)
 
 ---
@@ -181,3 +182,50 @@ npm run tauri build
 ### 다음 단계로 남은 것
 * 4단계: SQLite 기반 로컬 RAG 검색
 * 5단계: llama.cpp / GGUF / SQLite 포함 최종 패키징
+
+---
+
+## 4단계 구현 기록
+
+### 구현 내용
+* 상단에 `AI에게 물어보기` 버튼을 추가해 질문 패널을 열고 닫을 수 있게 했다.
+* 질문 입력창, 예시 질문 버튼, 대화형 메시지 영역, 참고 일지 목록을 화면에 붙였다.
+* Rust 백엔드에 `ask_about_logs` 커맨드를 추가해 SQLite에서 관련 일지를 뽑고, 질문 맥락을 생성한 뒤 로컬 LLM에 전달하도록 구성했다.
+* 번들된 `llama.cpp`와 GGUF 모델이 있으면 실제 답변을 생성하고, 없으면 관련 일지 요약을 오프라인 방식으로 반환한다.
+* 질문 결과에는 참고한 일지 날짜와 제목을 보여 주어 사용자가 근거를 바로 확인할 수 있게 했다.
+
+### 변경된 파일
+* [src-tauri/src/lib.rs](src-tauri/src/lib.rs)
+* [src/services/ipc.ts](src/services/ipc.ts)
+* [src/App.tsx](src/App.tsx)
+* [src/App.css](src/App.css)
+
+### 생성된 파일
+* 신규 생성 파일은 없음
+
+### 프로젝트 트리 변화
+* `src-tauri/src/lib.rs`에 RAG 관련 검색/요약/LLM 호출 커맨드가 추가됨
+* `src/services/ipc.ts`에 `askAboutLogs` IPC 래퍼와 RAG 타입이 추가됨
+* `src/App.tsx`에 AI 질문 패널, 대화 기록, 예시 질문, 참고 일지 표시가 추가됨
+* `src/App.css`에 질문 패널과 채팅 메시지 스타일이 추가됨
+
+### 주요 코드 설명
+* `find_relevant_logs`: SQLite 전체 일지에서 질문과 관련 높은 항목을 점수화해 정렬한다.
+* `build_rag_prompt`: 검색된 일지를 근거로 답해야 한다는 조건이 포함된 프롬프트를 만든다.
+* `try_llama_prompt`: 질문 응답용으로 번들 llama.cpp와 모델을 우선 시도한다.
+* `askQuestion`: 화면에서 질문을 보내고 답변과 참고 일지를 대화 목록에 붙인다.
+
+### 실행 방법
+```bash
+npm run tauri dev
+```
+
+### 빌드 방법
+```bash
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml
+npm run tauri build
+```
+
+### 다음 단계로 남은 것
+* 5단계: llama.cpp / SQLite / GGUF 모델 포함 최종 패키징
