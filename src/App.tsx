@@ -6,6 +6,7 @@ import {
   createLog,
   updateLog,
   deleteLog,
+  convertLogContent,
   DailyLog
 } from './services/ipc';
 import './App.css';
@@ -25,6 +26,8 @@ function App() {
   const [editorContent, setEditorContent] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertEngine, setConvertEngine] = useState('');
 
   const getTodayString = () => {
     const d = new Date();
@@ -145,6 +148,30 @@ function App() {
     }
   };
 
+  const handleConvert = async () => {
+    if (!editorContent.trim()) {
+      showError('AI Convert를 실행할 내용을 입력해 주세요.');
+      return;
+    }
+
+    setIsConverting(true);
+    setConvertEngine('');
+    try {
+      const result = await convertLogContent(editorTitle, editorContent);
+      setEditorContent(result.converted);
+      setConvertEngine(result.engine);
+      showSuccess(
+        result.engine === 'llama.cpp'
+          ? '로컬 LLM으로 업무일지 문체를 정리했습니다.'
+          : '번들된 LLM 모델이 없어 오프라인 정리 엔진으로 업무일지 문체를 정리했습니다.'
+      );
+    } catch (err: any) {
+      showError('AI Convert 실패: ' + err.toString());
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   const handleDbFolderChange = async () => {
     try {
       const newPath = await setDbFolder();
@@ -193,7 +220,7 @@ function App() {
         <div className="brand">
           <span className="logo-icon">📝</span>
           <h1>BuildAI</h1>
-          <span className="badge">1단계</span>
+          <span className="badge">2단계</span>
         </div>
         
         <div className="filter-bar">
@@ -314,6 +341,15 @@ function App() {
                 />
               </div>
               <div className="editor-actions">
+                <button
+                  type="button"
+                  className="convert-btn"
+                  onClick={handleConvert}
+                  disabled={isConverting}
+                  title="작성 내용을 사내 업무일지 형식으로 정리"
+                >
+                  {isConverting ? '변환 중...' : 'AI Convert'}
+                </button>
                 {!isCreating && selectedLog && (
                   <button
                     type="button"
@@ -344,6 +380,12 @@ function App() {
             </div>
 
             <div className="editor-meta-footer">
+              {convertEngine && (
+                <>
+                  <span>AI Convert 엔진: {convertEngine}</span>
+                  <span className="separator">•</span>
+                </>
+              )}
               {!isCreating && selectedLog && (
                 <>
                   <span>최초 생성: {new Date(selectedLog.created_at).toLocaleString()}</span>

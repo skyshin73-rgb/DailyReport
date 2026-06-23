@@ -9,6 +9,12 @@ export interface DailyLog {
   updated_at: string;
 }
 
+export interface ConvertResult {
+  converted: string;
+  engine: string;
+  prompt: string;
+}
+
 /**
  * 현재 SQLite 데이터베이스 파일 경로를 조회합니다.
  */
@@ -75,4 +81,17 @@ export async function updateLog(
  */
 export async function deleteLog(id: number): Promise<void> {
   return await invoke<void>('delete_log', { id });
+}
+
+/**
+ * 작성 중인 업무 내용을 로컬 AI 엔진으로 업무일지 문체에 맞게 변환합니다.
+ */
+export async function convertLogContent(
+  title: string,
+  content: string
+): Promise<ConvertResult> {
+  return await invoke<ConvertResult>('convert_log_content', {
+    title: title || null,
+    content,
+  });
 }
