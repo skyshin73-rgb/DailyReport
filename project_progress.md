@@ -17,7 +17,7 @@
 ## 🛠️ 기술 스택 및 배포 조건
 * **Frontend**: React + TypeScript + Vite
 * **Desktop Framework**: Tauri v2
-* **Database**: SQLite (로컬에 파일로 자동 생성)
+* **Database**: SQLite (로컬에 파일로 자동 생성, `rusqlite` bundled 사용)
 * **Local AI Engine**: llama.cpp (임베디드 런타임 형태로 최종 패키징 포함)
 * **Local LLM Model**: GGUF 형식 모델 (Qwen 2.5/3- Instruct 또는 Gemma 2/3 등 경량 GGUF)
 * **사용 금지 기술**: Java, Spring, Maven, Gradle, Ollama 의존성, Python 런타임 의존성
@@ -27,17 +27,17 @@
 
 ## 📈 진행률 및 상태 요약
 
-* **현재 단계**: 1단계 개발 준비 완료 (1단계 시작 전 상태)
-* **전체 진행률**: 10%
+* **현재 단계**: 1단계 구현 완료 (2단계 시작 전 상태)
+* **전체 진행률**: 30%
 * **완료된 작업**:
-  * [x] Tauri v2 + React + TypeScript 프로젝트 스캐폴딩 완료
+  * [x] Tauri v2 + React + TypeScript 프로젝트 스캐폴딩 및 `main.rs` 빌드 에러 해결
   * [x] npm 의존성 설치 및 빌드 환경(Cargo & Rust 환경) 검증 완료
   * [x] 프로젝트 초기 폴더 구조 정의 및 생성 완료
-  * [x] 프로젝트 진행 상황 기록용 `project_progress.md` 파일 작성 완료
+  * [x] **SQLite DB 자동 생성 및 로컬 경로 관리 설계**: `AppData/Local/BuildAI/config.json`을 통해 설정된 `buildai.db` 경로를 동적으로 로드 및 최초 생성 자동화
+  * [x] **기본 업무 일지 CRUD 기능 및 타임라인 UI 구현**: Rust backend에서 SQLite 연동을 담당하는 Tauri command(`get_logs`, `create_log`, `update_log`, `delete_log`, `get_db_path`, `set_db_folder`) 완성
+  * [x] **UI & UX 퍼블리싱**: Glassmorphism 다크 모드, 실시간 검색, 날짜 범위 필터링, 저장 폴더 변경 기능, 반응형 타임라인 레이아웃 구현
 * **미진한 사항 / 진행 예정**:
-  * [ ] SQLite DB 자동 생성 및 로컬 경로 관리 설계 (1단계)
-  * [ ] 기본 업무 일지 CRUD 기능 및 타임라인 UI 구현 (1단계)
-  * [ ] AI 변환 기능 구현 (2단계)
+  * [ ] AI Convert 기능 구현 (2단계)
   * [ ] 대량 과거 일지 파일 드래그앤드롭 업로드 기능 (3단계)
   * [ ] SQLite 데이터 기반 로컬 RAG 검색 기능 구현 (4단계)
   * [ ] llama.cpp / SQLite / GGUF 모델 패키징 및 최종 exe 빌드 (5단계)
@@ -59,16 +59,16 @@ BuildAI/
 │   ├── database/          # SQLite 및 DB 관련 프론트엔드 연동부/IPC 서비스
 │   ├── ai/                # 로컬 AI 연동 래퍼 서비스
 │   ├── pages/             # 메인 화면 구성 및 레이아웃
-│   ├── services/          # 비즈니스 로직 및 API 대행 서비스
-│   ├── App.css            # 글로벌 스타일링
-│   ├── App.tsx            # 메인 앱 엔트리 컴포넌트
+│   ├── services/          # 비즈니스 로직 및 API 대행 서비스 (ipc.ts 추가)
+│   ├── App.css            # 글로벌 스타일링 (다크 테마 디자인 시스템 완성)
+│   ├── App.tsx            # 메인 앱 엔트리 컴포넌트 (타임라인, 일지 작성 폼 완성)
 │   ├── main.tsx           # React 엔트리 포인트
 │   └── vite-env.d.ts
 ├── src-tauri/             # Tauri Backend (Rust) 소스 코드
 │   ├── src/
 │   │   ├── main.rs        # Tauri 앱 시작점 및 커맨드 등록
-│   │   └── lib.rs         # 로직 모듈 구성
-│   ├── Cargo.toml         # Rust 종속성 설정
+│   │   └── lib.rs         # SQLite 연동, 마이그레이션, DB 폴더 변경 기능 구현
+│   ├── Cargo.toml         # Rust 종속성 설정 (rusqlite, chrono, rfd 추가)
 │   ├── tauri.conf.json    # Tauri 애플리케이션 설정
 │   └── capabilities/      # 보안 및 권한 설정
 ├── package.json           # npm 종속성 설정
